@@ -71,7 +71,7 @@ class Validator(object):
     """Validates digitized audio and moving image assets."""
 
     def __init__(self, region, s3_role_arn, source_bucket, destination_bucket, source_filename, source_size, tmp_dir, aurora_baseurl,
-                 aurora_oauth_client_baseurl, aurora_oauth_client_id, aurora_oauth_client_secret):
+                 aurora_oauth_client_baseurl, aurora_oauth_client_id, aurora_oauth_client_secret, virus_check_outcome):
         self.s3_role_arn = s3_role_arn
         self.region = region
         self.source_bucket = source_bucket
@@ -80,6 +80,7 @@ class Validator(object):
         self.source_size = source_size
         self.transfer_id = str(uuid4())
         self.tmp_dir = tmp_dir
+        self.virus_check_outcome = virus_check_outcome
         self.service_name = 'born_digital_validation'
         self.aurora_client = AuroraClient(
             aurora_baseurl,
@@ -103,31 +104,34 @@ class Validator(object):
                 self.source_size)
             transfer_uri = new_transfer['url']
             self.aurora_client.create_event("ASAVE", transfer_uri)
+            if self.virus_check_outcome == 'NO_THREATS_FOUND':
+                downloaded_path = self.download_bag(self.source_filename)
+                extracted_path = self.extract_bag(filetype, downloaded_path)
+                self.validate_filename(extracted_path)
+                manifest = self.validate_bag(extracted_path)
+                self.aurora_client.update_transfer(transfer_uri, {'manifest': manifest})
+                self.aurora_client.create_event("PBAG", transfer_uri)
+                bag_info = self.validate_metadata(extracted_path, org['bagit_profiles'][0])
+                self.aurora_client.save_bag_info(transfer_uri, org['id'], bag_info)
+                self.aurora_client.create_event("PBAGP", transfer_uri)
 
-            downloaded_path = self.download_bag(self.source_filename)
-            # TODO virus checking
-            extracted_path = self.extract_bag(filetype, downloaded_path)
-            self.validate_filename(extracted_path)
-            manifest = self.validate_bag(extracted_path)
-            self.aurora_client.update_transfer(transfer_uri, {'manifest': manifest})
-            self.aurora_client.create_event("PBAG", transfer_uri)
-            bag_info = self.validate_metadata(extracted_path, org['bagit_profile'])
-            self.aurora_client.save_bag_info(transfer_uri, org['id'], bag_info)
-            self.aurora_client.create_event("PBAGP", transfer_uri)
+                renamed_path = Path(self.tmp_dir, self.transfer_id)
+                move(extracted_path, renamed_path)
+                compressed_path = self.compress_transfer(renamed_path)
 
-            renamed_path = Path(self.tmp_dir, self.transfer_id)
-            move(extracted_path, renamed_path)
-            self.compress_transfer(renamed_path)
-
-            self.aurora_client.update_transfer(
-                transfer_uri,
-                {
-                    "bag_it_valid": True,
-                    "process_status": "Validated"
-                })
-            self.aurora_client.create_event("APASS", transfer_uri)
-            logging.info(f'Package {self.source_filename} successfully validated and assigned ID {self.transfer_id}.')
-            self.cleanup_binaries(self.source_filename)
+                self.aurora_client.update_transfer(
+                    transfer_uri,
+                    {
+                        "bag_it_valid": True,
+                        "process_status": 40
+                    })
+                self.aurora_client.create_event("APASS", transfer_uri)
+                self.move_to_destination(compressed_path)
+                logging.info(f'Package {self.source_filename} successfully validated and assigned ID {self.transfer_id}.')
+            elif self.virus_check_outcome == 'THREATS_FOUND':
+                self.aurora_client.create_event("VIRUS", transfer_uri)
+            else:
+                self.aurora_client.create_event("VCONN", transfer_uri)
         except ValidationError as e:
             logging.exception(e)
             if (transfer_uri and getattr(e, 'error_code')):
@@ -135,9 +139,10 @@ class Validator(object):
                     transfer_uri,
                     {
                         "additional_error_info": str(e),
-                        "process_status": "Invalid"
+                        "process_status": 30
                     })
                 self.aurora_client.create_event(e.error_code, transfer_uri)
+        self.cleanup_binaries(self.source_filename)
 
     def get_client_with_role(self, resource, role_arn):
         """Gets Boto3 client which authenticates with a specific IAM role."""
@@ -308,6 +313,7 @@ if __name__ == '__main__':
     aurora_oauth_client_baseurl = getenv('AURORA_OAUTH_CLIENT_BASEURL')
     aurora_oauth_client_id = getenv('AURORA_OAUTH_CLIENT_ID')
     aurora_oauth_client_secret = getenv('AURORA_OAUTH_CLIENT_SECRET')
+    virus_check_outcome = getenv('VIRUS_CHECK_OUTCOME')
 
     logging.debug('Validator instantiated.')
 
@@ -320,4 +326,7 @@ if __name__ == '__main__':
         source_size,
         tmp_dir,
         aurora_baseurl,
-        aurora_oauth_client_baseurl, aurora_oauth_client_id, aurora_oauth_client_secret).run()
+        aurora_oauth_client_baseurl,
+        aurora_oauth_client_id,
+        aurora_oauth_client_secret,
+        virus_check_outcome).run()

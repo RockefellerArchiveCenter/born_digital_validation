@@ -23,7 +23,8 @@ ARGS = [
     'https://aurora.rockarch.org/api',
     'https://oauth.org/',
     '12345678987654321',
-    'a12bc3d4e5f6g7h8i9']
+    'a12bc3d4e5f6g7h8i9',
+    'NO_THREATS_FOUND']
 
 
 class ValidatorTests(TestCase):
@@ -74,20 +75,22 @@ class ValidatorTests(TestCase):
     @patch('src.clients.AuroraClient.save_bag_info')
     @patch('src.validate.move')
     @patch('src.validate.Validator.compress_transfer')
+    @patch('src.validate.Validator.move_to_destination')
     @patch('src.validate.Validator.cleanup_binaries')
-    def test_run(self, mock_cleanup, mock_compress, mock_move, mock_save_bag_info, mock_validate_metadata, mock_update_transfer,
+    def test_run(self, mock_cleanup, mock_move_to_destination, mock_compress, mock_move, mock_save_bag_info, mock_validate_metadata, mock_update_transfer,
                  mock_validate_bag, mock_validate_filename, mock_extract_bag, mock_download, mock_create_event,
                  mock_create_transfer, mock_filetype, mock_org):
         """Asserts correct methods are called by run method."""
         bagit_profile_url = "https://aurora.rockarch.org/orgs/1/bagit_profile"
         new_transfer_url = "https://aurora.rockarch.org/transfers/1"
-        mock_org.return_value = {"id": "1", "bagit_profile": bagit_profile_url}
+        mock_org.return_value = {"id": "1", "bagit_profiles": [bagit_profile_url]}
         mock_filetype.return_value = "tar"
         mock_create_transfer.return_value = {"url": new_transfer_url}
         mock_download.return_value = Path("/downloaded")
         mock_extract_bag.return_value = Path("/extracted")
         mock_validate_bag.return_value = "this is a manifest"
         mock_validate_metadata.return_value = {"foo": "bar"}
+        mock_compress.return_value = "compressed"
 
         self.validator.run()
 
@@ -102,10 +105,11 @@ class ValidatorTests(TestCase):
         mock_save_bag_info.assert_called_once_with(new_transfer_url, '1', {"foo": "bar"})
         mock_move.assert_called_once_with(Path("/extracted"), Path(self.validator.tmp_dir, self.validator.transfer_id))
         mock_compress.assert_called_once_with(Path(self.validator.tmp_dir, self.validator.transfer_id))
+        mock_move_to_destination.assert_called_once_with("compressed")
         mock_cleanup.assert_called_once_with(self.validator.source_filename)
         mock_update_transfer.assert_has_calls([
             call(new_transfer_url, {'manifest': 'this is a manifest'}),
-            call(new_transfer_url, {'bag_it_valid': True, 'process_status': 'Validated'})])
+            call(new_transfer_url, {'bag_it_valid': True, 'process_status': 40})])
         mock_create_event.assert_has_calls([
             call('ASAVE', new_transfer_url),
             call('PBAG', new_transfer_url),
@@ -125,14 +129,15 @@ class ValidatorTests(TestCase):
     @patch('src.clients.AuroraClient.save_bag_info')
     @patch('src.validate.move')
     @patch('src.validate.Validator.compress_transfer')
+    @patch('src.validate.Validator.move_to_destination')
     @patch('src.validate.Validator.cleanup_binaries')
-    def test_run_with_exception(self, mock_cleanup, mock_compress, mock_move, mock_save_bag_info, mock_validate_metadata, mock_update_transfer,
+    def test_run_with_exception(self, mock_cleanup, mock_move_to_destination, mock_compress, mock_move, mock_save_bag_info, mock_validate_metadata, mock_update_transfer,
                                 mock_validate_bag, mock_validate_filename, mock_extract_bag, mock_download, mock_create_event,
                                 mock_create_transfer, mock_filetype, mock_org):
         """Asserts exceptions are correctly handled."""
         bagit_profile_url = "https://aurora.rockarch.org/orgs/1/bagit_profile"
         new_transfer_url = "https://aurora.rockarch.org/transfers/1"
-        mock_org.return_value = {"id": "1", "bagit_profile": bagit_profile_url}
+        mock_org.return_value = {"id": "1", "bagit_profiles": [bagit_profile_url]}
         mock_filetype.return_value = "tar"
         mock_create_transfer.return_value = {"url": new_transfer_url}
         mock_download.side_effect = DownloadError("foo")
@@ -150,12 +155,62 @@ class ValidatorTests(TestCase):
         mock_save_bag_info.assert_not_called()
         mock_move.assert_not_called()
         mock_compress.assert_not_called()
-        mock_cleanup.assert_not_called()
+        mock_move_to_destination.assert_not_called()
+        mock_cleanup.assert_called_once_with(self.validator.source_filename)
         mock_update_transfer.assert_has_calls([
-            call('https://aurora.rockarch.org/transfers/1', {'additional_error_info': 'foo', 'process_status': 'Invalid'})])
+            call('https://aurora.rockarch.org/transfers/1', {'additional_error_info': 'foo', 'process_status': 30})])
         mock_create_event.assert_has_calls([
             call('ASAVE', new_transfer_url),
             call('DEXT', new_transfer_url)])
+
+    @patch('src.clients.AuroraClient.org_by_upload_target')
+    @patch('src.validate.Validator.get_filetype')
+    @patch('src.clients.AuroraClient.create_transfer')
+    @patch('src.clients.AuroraClient.create_event')
+    @patch('src.validate.Validator.download_bag')
+    @patch('src.validate.Validator.extract_bag')
+    @patch('src.validate.Validator.validate_filename')
+    @patch('src.validate.Validator.validate_bag')
+    @patch('src.clients.AuroraClient.update_transfer')
+    @patch('src.validate.Validator.validate_metadata')
+    @patch('src.clients.AuroraClient.save_bag_info')
+    @patch('src.validate.move')
+    @patch('src.validate.Validator.compress_transfer')
+    @patch('src.validate.Validator.move_to_destination')
+    @patch('src.validate.Validator.cleanup_binaries')
+    def test_run_with_virus(self, mock_cleanup, mock_move_to_destination, mock_compress, mock_move, mock_save_bag_info, mock_validate_metadata, mock_update_transfer,
+                            mock_validate_bag, mock_validate_filename, mock_extract_bag, mock_download, mock_create_event,
+                            mock_create_transfer, mock_filetype, mock_org):
+        """Asserts packages with viruses are handled correctly"""
+        bagit_profile_url = "https://aurora.rockarch.org/orgs/1/bagit_profile"
+        new_transfer_url = "https://aurora.rockarch.org/transfers/1"
+        mock_org.return_value = {"id": "1", "bagit_profiles": [bagit_profile_url]}
+        mock_filetype.return_value = "tar"
+        mock_create_transfer.return_value = {"url": new_transfer_url}
+
+        for status, expected_code in [('THREATS_FOUND', 'VIRUS'), ('ACCESS_DENIED', 'VCONN'), ('FAILED', 'VCONN')]:
+            self.validator.virus_check_outcome = status
+            self.validator.run()
+
+            mock_org.assert_called_once_with(self.validator.source_bucket)
+            mock_filetype.assert_called_once_with(self.validator.source_filename)
+            mock_create_transfer.assert_called_once_with('1', 'tar', 'new-transfer.tar.gz', ANY, 'source_bucket', '12345678')
+            mock_download.assert_not_called()
+            mock_extract_bag.assert_not_called()
+            mock_validate_filename.assert_not_called()
+            mock_validate_bag.assert_not_called()
+            mock_validate_metadata.assert_not_called()
+            mock_save_bag_info.assert_not_called()
+            mock_move.assert_not_called()
+            mock_compress.assert_not_called()
+            mock_move_to_destination.assert_not_called()
+            mock_cleanup.assert_called_once_with(self.validator.source_filename)
+            mock_create_event.assert_has_calls([
+                call('ASAVE', new_transfer_url),
+                call(expected_code, new_transfer_url)])
+
+            for mock in [mock_org, mock_filetype, mock_create_transfer, mock_cleanup, mock_create_event]:
+                mock.reset_mock()
 
     def test_get_filetype(self):
         """Asserts filetype is correctly parsed."""

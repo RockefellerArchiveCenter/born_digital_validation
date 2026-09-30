@@ -26,7 +26,7 @@ class AuroraClientTests(TestCase):
     @patch('electronbonder.client.ElectronBond.post')
     def test_create_event(self, mock_post):
         expected_data = {"foo": "bar"}
-        mock_post.return_value = MockResponse(expected_data, 200)
+        mock_post.return_value = MockResponse(expected_data, 201)
         transfer_uri = '/transfers/12/'
         short_code = 'PBAGP'
 
@@ -41,7 +41,7 @@ class AuroraClientTests(TestCase):
     @patch('electronbonder.client.ElectronBond.post')
     def test_create_transfer(self, mock_post):
         expected_data = {"foo": "bar"}
-        mock_post.return_value = MockResponse(expected_data, 200)
+        mock_post.return_value = MockResponse(expected_data, 201)
         org_id = '1'
         source_filetype = '.tar'
         source_filename = 'new_transfer.tar.gz'
@@ -54,27 +54,27 @@ class AuroraClientTests(TestCase):
         mock_post.assert_called_once_with(
             '/transfers/',
             json={
-                "organization": org_id,
-                "machine_file_path": source_filename,
-                "machine_file_size": source_size,
-                "machine_file_upload_time": ANY,
-                "machine_file_identifier": transfer_id,
-                "machine_file_type": source_filetype,
+                "organization": f'/api/orgs/{org_id}/',
+                "file_path": source_filename,
+                "file_size": source_size,
+                "file_upload_time": ANY,
+                "identifier": transfer_id,
+                "file_type": source_filetype,
                 "bag_it_name": str(Path(source_filename).stem)
             },
             headers={"Content-Type": "application/json"})
 
-    @patch('electronbonder.client.ElectronBond.put')
-    def test_update_transfer(self, mock_put):
+    @patch('electronbonder.client.ElectronBond.patch')
+    def test_update_transfer(self, mock_patch):
         expected_data = {"foo": "bar"}
-        mock_put.return_value = MockResponse(expected_data, 200)
+        mock_patch.return_value = MockResponse(expected_data, 200)
         transfer_uri = '/transfers/12/'
         data = {"baz": "buzz"}
 
         output = self.client.update_transfer(transfer_uri, data)
 
         self.assertEqual(output, expected_data)
-        mock_put.assert_called_once_with(
+        mock_patch.assert_called_once_with(
             transfer_uri,
             json=data,
             headers={"Content-Type": "application/json"})
@@ -97,7 +97,7 @@ class AuroraClientTests(TestCase):
     def test_save_bag_info(self, mock_post, mock_pad_date):
         mock_pad_date.return_value = '2021-01-01'
         expected_data = {"foo": "bar"}
-        mock_post.return_value = MockResponse(expected_data, 200)
+        mock_post.return_value = MockResponse(expected_data, 201)
         bag_info_data = {
             "External-Identifier": "12345",
             "Internal-Sender-Description": "Transfer description",
@@ -110,9 +110,7 @@ class AuroraClientTests(TestCase):
             "Record-Creators": ["Mickey Mouse", "Daffy Duck"]
         }
         transfer_uri = '/transfers/12/'
-        org_id = '1'
         output_data = {
-            "source_organization": org_id,
             "external_identifier": "12345",
             "internal_sender_description": "Transfer description",
             "title": "Transfer title",
@@ -128,11 +126,11 @@ class AuroraClientTests(TestCase):
             "language_list": []
         }
 
-        output = self.client.save_bag_info(transfer_uri, org_id, bag_info_data)
+        output = self.client.save_bag_info(transfer_uri, bag_info_data)
 
         self.assertEqual(output, expected_data)
         mock_post.assert_called_once_with(
-            '/transfers/12/bag-info/',
+            '/transfers/12/save_bag_info/',
             json=output_data,
             headers={"Content-Type": "application/json"})
         mock_pad_date.assert_has_calls([
