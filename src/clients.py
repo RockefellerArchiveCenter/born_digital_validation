@@ -27,7 +27,7 @@ class AuroraClient:
             "/events/",
             json=data,
             headers={"Content-Type": "application/json"})
-        if resp.status_code == 200:
+        if resp.status_code == 201:
             return resp.json()
         else:
             raise Exception(
@@ -36,27 +36,29 @@ class AuroraClient:
     def create_transfer(self, org_id, source_filetype, source_filename, transfer_id, source_size):
         """Creates a new transfer in Aurora."""
         data = {
-            "organization": org_id,
-            "machine_file_path": source_filename,
-            "machine_file_size": source_size,
-            "machine_file_upload_time": datetime.now(),
-            "machine_file_identifier": transfer_id,
-            "machine_file_type": source_filetype,
+            "organization": f"/api/orgs/{org_id}/",
+            "file_path": source_filename,
+            "file_size": source_size,
+            "file_upload_time": str(datetime.now()),
+            "identifier": transfer_id,
+            "file_type": source_filetype,
             "bag_it_name": str(Path(source_filename).stem)
         }
         resp = self.client.post(
             "/transfers/",
             json=data,
             headers={"Content-Type": "application/json"})
-        if resp.status_code == 200:
+        if resp.status_code == 201:
             return resp.json()
         else:
             raise Exception(
                 f"Error creating event in Aurora for with data {data}: {resp.status_code} {resp.text}")
 
-    def update_transfer(self, uri, data):
+    def update_transfer(self, full_url, data):
         """Updates data for an existing transfer"""
-        resp = self.client.put(
+        package_id = full_url.rstrip('/').split('/')[-1]
+        uri = f'/transfers/{package_id}/'
+        resp = self.client.patch(
             uri,
             json=data,
             headers={"Content-Type": "application/json"})
@@ -80,10 +82,9 @@ class AuroraClient:
             raise Exception(
                 f"Error getting organization with upload target {upload_target}: {resp.status_code} {resp.text}")
 
-    def save_bag_info(self, transfer_uri, org_id, bag_info):
+    def save_bag_info(self, transfer_uri, bag_info):
         """Saves BagInfo data for a transfer."""
         data = {
-            "source_organization": org_id,
             "external_identifier": bag_info.get("External-Identifier", ""),
             "internal_sender_description": bag_info.get("Internal-Sender-Description", ""),
             "title": bag_info.get("Title", ""),
@@ -97,11 +98,13 @@ class AuroraClient:
             "bagit_profile_identifier": bag_info.get("BagIt-Profile-Identifier", ""),
             "creators_list": bag_info.get("Record-Creators", []),
             "language_list": bag_info.get("Language", [])}
+        package_id = transfer_uri.rstrip('/').split('/')[-1]
+        uri = f'/transfers/{package_id}/save_bag_info/'
         resp = self.client.post(
-            f'{transfer_uri.rstrip("/")}/bag-info/',
+            uri,
             json=data,
             headers={"Content-Type": "application/json"})
-        if resp.status_code == 200:
+        if resp.status_code == 201:
             return resp.json()
         else:
             raise Exception(
