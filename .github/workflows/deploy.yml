@@ -9,7 +9,8 @@ on:
   push:
     branches:
       - development
-      - base
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
