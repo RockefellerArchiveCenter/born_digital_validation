@@ -6,19 +6,19 @@ bagit==1.9.0
     #   bagit-profile
 bagit-profile==1.3.1
     # via -r requirements.in
-boto3==1.43.117
+boto3==1.43.123
     # via
     #   -r requirements.in
     #   aws-assume-role-lib
-botocore==1.43.117
+botocore==1.43.123
     # via
     #   boto3
     #   s3transfer
-certifi==2026.10.19
+certifi==2026.10.23
     # via requests
 charset-normalizer==3.5.2
     # via requests
-electronbonder==2.2.8
+electronbonder==2.2.9
     # via -r requirements.in
 idna==3.20
     # via requests
@@ -28,7 +28,7 @@ jmespath==1.1.0
     # via
     #   boto3
     #   botocore
-oauthlib==4.0.0
+oauthlib==4.0.1
     # via requests-oauthlib
 python-dateutil==2.9.0.post0
     # via botocore
