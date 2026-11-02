@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.1](https://github.com/RockefellerArchiveCenter/born_digital_validation/compare/v1.0.0...v1.0.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **deps:** Scheduled dependency updates ([062fc98](https://github.com/RockefellerArchiveCenter/born_digital_validation/commit/062fc984588dcf9ba3338f8bee67ed2fb9be2a96))
+* **deps:** Scheduled dependency updates ([062fc98](https://github.com/RockefellerArchiveCenter/born_digital_validation/commit/062fc984588dcf9ba3338f8bee67ed2fb9be2a96))
+* **deps:** Scheduled dependency updates ([c8972ae](https://github.com/RockefellerArchiveCenter/born_digital_validation/commit/c8972ae9d28abfd6e38a1bdfc5c26a596f18d8c9))
+* **deps:** Scheduled dependency updates ([c8972ae](https://github.com/RockefellerArchiveCenter/born_digital_validation/commit/c8972ae9d28abfd6e38a1bdfc5c26a596f18d8c9))
+* **deps:** Scheduled dependency updates ([da95f1e](https://github.com/RockefellerArchiveCenter/born_digital_validation/commit/da95f1eaa6b328f96255d9b7f89d9cb6594ed0a3))
+
 ## 1.0.0 (2026-11-02)
 
 
