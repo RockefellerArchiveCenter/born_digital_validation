@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.2](https://github.com/RockefellerArchiveCenter/born_digital_validation/compare/v1.0.1...v1.0.2) (2026-11-19)
+
+
+### Bug Fixes
+
+* deploy update ([008ed32](https://github.com/RockefellerArchiveCenter/born_digital_validation/commit/008ed3253c99039e9a5578d05d39700d5824cf15))
+* update deploy ([bec75db](https://github.com/RockefellerArchiveCenter/born_digital_validation/commit/bec75db31addbc7b3e3df539da6711a98986bf45))
+* update deploy ([727c220](https://github.com/RockefellerArchiveCenter/born_digital_validation/commit/727c220a52fc0b464f8b2105235ccc0bbb54d408))
+
 ## [1.0.1](https://github.com/RockefellerArchiveCenter/born_digital_validation/compare/v1.0.0...v1.0.1) (2026-11-02)
 
 
